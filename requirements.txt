@@ -1,0 +1,10 @@
+dashscope~=1.25.1
+pyaudio~=0.2.14
+python-dotenv~=1.2.1
+
+
+dotenv~=0.9.9
+jieba3k~=0.35.1
+numpy~=2.2.5
+langchain-core~=0.3.77
+langchain-openai~=0.3.16
