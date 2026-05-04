@@ -11,7 +11,7 @@ from .command_execution_agent import CommandExecutionAgent
 
 class CoreAgent:
     """
-    会议助手的核心Agent，负责协调语音识别、文本分析等功能模块
+    Core Agent for meeting assistant, responsible for coordinating speech recognition, text analysis, and other functional modules
     """
     
     def __init__(self, 
@@ -19,12 +19,12 @@ class CoreAgent:
                  openai_api_key: Optional[str] = None,
                  config: Optional[Dict[str, Any]] = None):
         """
-        初始化CoreAgent
+        Initialize CoreAgent
         
         Args:
-            dashscope_api_key: DashScope API密钥
-            openai_api_key: OpenAI API密钥
-            config: 配置参数字典
+            dashscope_api_key: DashScope API key
+            openai_api_key: OpenAI API key
+            config: Configuration parameter dictionary
         """
         # 设置API密钥环境变量
         if dashscope_api_key:
@@ -33,8 +33,8 @@ class CoreAgent:
         # 合并默认配置
         self.config = self._merge_config(config or {})
         
-        # 初始化语音识别Agent
-        # 从环境变量获取唤醒关键词
+        # Initialize speech recognition Agent
+        # Get wake-up keyword from environment variable
         
         self.speech_recognition_agent = SpeechRecognitionAgent(
             sample_rate=self.config['sample_rate'],
@@ -69,7 +69,7 @@ class CoreAgent:
         self.command_execution_agent = CommandExecutionAgent()
         
         # 唤醒关键词和指令处理
-        self.wake_up_keyword = os.environ.get('WAKE_UP_KEYWORD', '小费同学')
+        self.wake_up_keyword = os.environ.get('WAKE_UP_KEYWORD', 'Assistant')
         self.is_awake = False
         self.command_buffer = []
         self.full_meeting_text = []  # 存储完整的会议文本
@@ -110,10 +110,10 @@ class CoreAgent:
     
     def start(self):
         """
-        启动会议助手
+        Start the meeting assistant
         """
         if self.is_running:
-            print("会议助手已经在运行中")
+            print("Meeting assistant is already running")
             return
 
         self.is_running = True
@@ -124,22 +124,22 @@ class CoreAgent:
         self.analysis_thread.daemon = True
         self.analysis_thread.start()
 
-        print("会议助手已启动")
-        print(f"语音识别模型: {self.config['speech_model']}")
-        print(f"关键词提取方法: {self.config['keyword_extraction_method']}")
+        print("Meeting assistant started")
+        print(f"Speech recognition model: {self.config['speech_model']}")
+        print(f"Keyword extraction method: {self.config['keyword_extraction_method']}")
 
         # 启动语音识别
         try:
             self.speech_recognition_agent.start_recognition()
         except Exception as e:
-            print(f"启动语音识别时出错: {e}")
+            print(f"Error starting speech recognition: {e}")
             self.stop()
             # 重新抛出异常，让调用方（如GUI）能够捕获和处理
             raise
     
     def stop(self):
         """
-        停止会议助手
+        Stop the meeting assistant
         """
         if not self.is_running:
             return
@@ -154,14 +154,14 @@ class CoreAgent:
         if self.analysis_thread and self.analysis_thread.is_alive():
             self.analysis_thread.join(timeout=5)
         
-        print("会议助手已停止")
+        print("Meeting assistant stopped")
     
     def _handle_recognized_text(self, text: str):
         """
-        处理识别到的文本
+        Handle recognized text
         
         Args:
-            text: 识别到的文本
+            text: Recognized text
         """
         # 更新最后语音时间
         self.last_speech_time = datetime.now()
@@ -199,10 +199,10 @@ class CoreAgent:
     
     def _handle_speech_complete(self, text: str):
         """
-        处理语音完成事件
+        Handle speech completion event
         
         Args:
-            text: 完成的语音文本
+            text: Completed speech text
         """
         # 合并当前缓冲区的完整文本
 
@@ -227,7 +227,7 @@ class CoreAgent:
     
     def _analysis_worker(self):
         """
-        分析线程工作函数，定期对累积的文本进行分析
+        Analysis thread worker function, periodically analyzes accumulated text
         """
         import time
         
@@ -246,12 +246,12 @@ class CoreAgent:
                 time.sleep(0.5)
                 
             except Exception as e:
-                print(f"分析线程出错: {e}")
+                print(f"Analysis thread error: {e}")
                 time.sleep(1)
     
     def _perform_analysis(self):
         """
-        执行文本分析，包括关键词提取和总结生成
+        Perform text analysis, including keyword extraction and summary generation
         """
         # 获取完整文本
         full_text = ' '.join(self.recognized_text_buffer)
@@ -280,61 +280,60 @@ class CoreAgent:
     
     def set_text_update_callback(self, callback: Callable[[str, str], None]):
         """
-        设置文本更新回调函数
+        Set text update callback function
         
         Args:
-            callback: 回调函数，接收(new_text, full_text)参数
+            callback: Callback function that receives (new_text, full_text) parameters
         """
         self.on_text_update_callback = callback
     
     def set_summary_update_callback(self, callback: Callable[[str], None]):
         """
-        设置总结更新回调函数
+        Set summary update callback function
         
         Args:
-            callback: 回调函数，接收summary参数
+            callback: Callback function that receives summary parameter
         """
         self.on_summary_update_callback = callback
     
     def set_keywords_update_callback(self, callback: Callable[[List[tuple]], None]):
         """
-        设置关键词更新回调函数
+        Set keywords update callback function
         
         Args:
-            callback: 回调函数，接收keywords参数
+            callback: Callback function that receives keywords parameter
         """
         self.on_keywords_update_callback = callback
     
     def set_speech_complete_callback(self, callback: Callable[[str], None]):
         """
-        设置语音完成回调函数
+        Set speech complete callback function
         
         Args:
-            callback: 回调函数，接收speech_text参数
+            callback: Callback function that receives speech_text parameter
         """
         self.on_speech_complete_callback = callback
     
     def set_command_executed_callback(self, callback: Callable[[str], None]):
         """
-        设置指令执行回调函数
+        Set command executed callback function
         
         Args:
-            callback: 回调函数，接收command_result参数
+            callback: Callback function that receives command_result parameter
         """
         self.on_command_executed_callback = callback
     
     def _check_wake_up_and_handle_command(self, text: str):
         """
-        检查唤醒关键词并处理指令
+        Check wake-up keyword and handle commands
         
         Args:
-            text: 当前识别的文本
-            full_meeting_text: 完整的会议文本
+            text: Currently recognized text
         """
         # 检查是否包含唤醒关键词
         if self.wake_up_keyword in text:
             self.is_awake = True
-            print(f"已唤醒！开始接收指令...")
+            print(f"Awake! Starting to receive commands...")
             # 提取唤醒关键词后的内容作为指令的开始部分
             keyword_index = text.find(self.wake_up_keyword)
             if keyword_index >= 0:
@@ -347,19 +346,19 @@ class CoreAgent:
     
     def _execute_command(self, command_text: str, full_meeting_text: str):
         """
-        执行指令（异步模式）
+        Execute command (asynchronous mode)
         
         Args:
-            command_text: 指令文本
-            full_meeting_text: 完整的会议文本
+            command_text: Command text
+            full_meeting_text: Complete meeting text
         """
-        print(f"执行指令: {command_text}")
+        print(f"Executing command: {command_text}")
         
-        # 清理指令文本，去除重复内容和不完整片段
+        # Clean command text, remove duplicate content and incomplete fragments
         def _clean_command_text(text):
             if not text:
                 return ""
-            # 去除重复的前缀
+            # Remove duplicate prefixes
             lines = text.split('\n')
             unique_lines = []
             seen = set()
@@ -369,7 +368,7 @@ class CoreAgent:
                     unique_lines.append(line)
             cleaned_text = '\n'.join(unique_lines)
             
-            # 提取完整的指令（如果有结束标记）
+            # Extract complete command (if there is an end marker)
             if '。' in cleaned_text or '!' in cleaned_text or '?' in cleaned_text or '.' in cleaned_text or '！' in cleaned_text or '？' in cleaned_text:
                 last_period = max(cleaned_text.rfind('。'), cleaned_text.rfind('!'), cleaned_text.rfind('?'), 
                                 cleaned_text.rfind('.'), cleaned_text.rfind('！'), cleaned_text.rfind('？'))
@@ -382,14 +381,14 @@ class CoreAgent:
         command_text = _clean_command_text(command_text)
         
         if not command_text or re.match(r'^[，。！？；：,.;:!?]+$', command_text):
-            print("无效指令，已忽略")
+            print("Invalid command, ignored")
             return
         
         # 定义指令执行完成后的回调函数
         def command_completion_callback(result: str):
-            # 确保结果不为空
+            # Ensure result is not empty
             if not result or result.strip() == "":
-                result = "指令执行成功，但未返回任何结果"
+                result = "Command executed successfully, but no results were returned"
             
             # 发送到结果队列
             command_result = {
@@ -401,7 +400,7 @@ class CoreAgent:
             self.result_queue.put(command_result)
             
             # 调用指令执行回调，确保在主线程中更新GUI
-            print(f"调用指令执行回调，结果长度: {len(result)}")
+            print(f"Calling command execution callback, result length: {len(result)}")
             if self.on_command_executed_callback:
                 self.on_command_executed_callback(result)
         
@@ -421,9 +420,9 @@ class CoreAgent:
             }
             self.result_queue.put(initial_command_result)
             
-            print(f"指令已提交执行，初始结果: {initial_result}")
+            print(f"Command submitted for execution, initial result: {initial_result}")
         except Exception as e:
-            error_message = f"指令执行失败: {str(e)}"
+            error_message = f"Command execution failed: {str(e)}"
             print(error_message)
             # 直接调用回调显示错误信息
             if self.on_command_executed_callback:
@@ -433,19 +432,19 @@ class CoreAgent:
     
     def get_current_text(self) -> str:
         """
-        获取当前识别的完整文本
+        Get the current complete recognized text
         
         Returns:
-            当前识别的完整文本
+            Current complete recognized text
         """
         return ' '.join(self.recognized_text_buffer)
     
     def get_current_analysis(self) -> Dict[str, Any]:
         """
-        获取当前的分析结果
+        Get current analysis results
         
         Returns:
-            包含关键词和总结的分析结果
+            Analysis results containing keywords and summaries
         """
         full_text = ' '.join(self.recognized_text_buffer)
         
@@ -468,13 +467,13 @@ class CoreAgent:
     
     def execute_command_directly(self, command_text: str) -> str:
         """
-        直接执行指令（用于GUI按钮触发），异步执行
+        Directly execute command (used for GUI button triggers), asynchronous execution
         
         Args:
-            command_text: 指令文本
+            command_text: Command text
         
         Returns:
-            指令提交确认信息
+            Command submission confirmation message
         """
         full_meeting_text = ' '.join(self.full_meeting_text)
         
@@ -493,22 +492,22 @@ class CoreAgent:
     
     def set_current_speaker(self, speaker: str):
         """
-        设置当前说话人
+        Set current speaker
         
         Args:
-            speaker: 说话人标识，如'A', 'B', '主持人'等
+            speaker: Speaker identifier, such as 'A', 'B', 'Moderator', etc.
         """
         self.current_speaker = speaker
     
     def get_next_result(self, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         """
-        获取下一个结果，用于流式处理
+        Get next result for streaming processing
         
         Args:
-            timeout: 超时时间（秒）
+            timeout: Timeout in seconds
             
         Returns:
-            结果字典，如果超时则返回None
+            Result dictionary, or None if timeout
         """
         try:
             return self.result_queue.get(timeout=timeout)

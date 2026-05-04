@@ -12,7 +12,7 @@ load_dotenv()
 
 class SpeechRecognitionAgent:
     """
-    语音识别Agent，负责将麦克风输入的语音实时转录为文本
+    Speech Recognition Agent, responsible for real-time transcription of microphone input speech to text
     """
 
     def __init__(self,
@@ -25,17 +25,17 @@ class SpeechRecognitionAgent:
                  on_speech_complete_callback: Optional[Callable[[str], None]] = None,
                  ):
         """
-        初始化语音识别Agent
+        Initialize Speech Recognition Agent
         
         Args:
-            sample_rate: 采样率
-            channels: 声道数
-            block_size: 缓冲区大小
-            format_pcm: 音频格式
-            semantic_punctuation_enabled: 是否启用语义标点
-            on_text_callback: 文本识别回调函数
-            on_speech_complete_callback: 语音完成回调函数
-            keywords: 需要增强识别的关键词列表
+            sample_rate: Sample rate
+            channels: Number of channels
+            block_size: Buffer size
+            format_pcm: Audio format
+            semantic_punctuation_enabled: Whether to enable semantic punctuation
+            on_text_callback: Text recognition callback function
+            on_speech_complete_callback: Speech completion callback function
+            keywords: List of keywords that need enhanced recognition
         """
         self.model = os.environ['DASHSCOPE_ASR_MODEL_NAME']
         self.sample_rate = sample_rate
@@ -46,11 +46,11 @@ class SpeechRecognitionAgent:
         self.on_text_callback = on_text_callback
         self.on_speech_complete_callback = on_speech_complete_callback
         self.keywords = []
-        # 从环境变量获取唤醒关键词
+        # Get wake-up keyword from environment variable
         if 'WAKE_UP_KEYWORD' in os.environ:
             self.keywords.append(os.environ['WAKE_UP_KEYWORD'])
 
-        # 热词表相关属性
+        # Vocabulary related properties
         self.vocabulary_service = None
         self.vocabulary_id = None
 
@@ -59,7 +59,7 @@ class SpeechRecognitionAgent:
         self.recognition = None
         self.is_recording = False
 
-        # 初始化API密钥
+        # Initialize API key
         self._init_api_key()
 
         self.mic = None
@@ -67,76 +67,76 @@ class SpeechRecognitionAgent:
         self.recognition = None
         self.is_recording = False
 
-        # 初始化API密钥
+        # Initialize API key
         self._init_api_key()
 
     def _init_api_key(self):
         """
-        初始化DashScope API密钥
+        Initialize DashScope API key
         """
         if 'DASHSCOPE_API_KEY' in os.environ:
             dashscope.api_key = os.environ['DASHSCOPE_API_KEY']
         else:
-            print("警告: 未找到DASHSCOPE_API_KEY环境变量，请确保正确设置")
+            print("Warning: DASHSCOPE_API_KEY environment variable not found, please ensure it is set correctly")
 
     def _create_vocabulary(self):
         """
-        创建热词表
+        Create vocabulary
         """
         if not self.keywords:
             return None
 
         try:
             self.vocabulary_service = VocabularyService()
-            # 准备热词数据
+            # Prepare vocabulary data
             vocabulary_data = [
                 {"text": keyword, "weight": 4, "lang": "zh"}
                 for keyword in self.keywords
             ]
 
-            # 创建热词表
-            print(f"正在创建热词表，关键词: {self.keywords}")
+            # Create vocabulary
+            print(f"Creating vocabulary, keywords: {self.keywords}")
             self.vocabulary_id = self.vocabulary_service.create_vocabulary(
                 prefix="meeting",
                 target_model=self.model,
                 vocabulary=vocabulary_data
             )
-            print(f"热词表创建成功，ID: {self.vocabulary_id}")
+            print(f"Vocabulary created successfully, ID: {self.vocabulary_id}")
             return self.vocabulary_id
         except Exception as e:
-            print(f"创建热词表失败: {e}")
+            print(f"Failed to create vocabulary: {e}")
             return None
 
     def _delete_vocabulary(self):
         """
-        删除热词表
+        Delete vocabulary
         """
         if self.vocabulary_service and self.vocabulary_id:
             try:
-                print(f"正在删除热词表: {self.vocabulary_id}")
+                print(f"Deleting vocabulary: {self.vocabulary_id}")
                 self.vocabulary_service.delete_vocabulary(self.vocabulary_id)
-                print("热词表已删除")
+                print("Vocabulary deleted")
             except Exception as e:
-                print(f"删除热词表失败: {e}")
+                print(f"Failed to delete vocabulary: {e}")
             finally:
                 self.vocabulary_id = None
                 self.vocabulary_service = None
 
     def start_recognition(self):
         """
-        开始语音识别
+        Start speech recognition
         """
         if self.is_recording:
-            print("语音识别已经在运行中")
+            print("Speech recognition is already running")
             return
 
-        # 创建回调处理器
+        # Create callback handler
         callback = CustomRecognitionCallback(self)
 
-        # 创建热词表
+        # Create vocabulary
         vocabulary_id = self._create_vocabulary()
 
-        # 初始化识别服务
+        # Initialize recognition service
         self.recognition = Recognition(
             model=self.model,
             format=self.format_pcm,
@@ -147,19 +147,19 @@ class SpeechRecognitionAgent:
             language_hints=['zh', 'en']
         )
 
-        # 启动识别
+        # Start recognition
         self.recognition.start()
         self.is_recording = True
 
-        # 此处不再设置signal处理器，由调用方负责停止
-        print("语音识别已启动")
+        # Audio stream transmission is no longer set with signal processor here, it is the responsibility of the caller to stop
+        print("Speech recognition started")
 
-        # 开始音频流传输
+        # Start audio stream transmission
         self._start_audio_stream()
 
     def _start_audio_stream(self):
         """
-        开始音频流传输
+        Start audio stream transmission
         """
         try:
             while self.is_recording:
@@ -169,24 +169,24 @@ class SpeechRecognitionAgent:
                 else:
                     break
         except Exception as e:
-            print(f"音频流传输错误: {e}")
+            print(f"Audio stream transmission error: {e}")
             self.stop_recognition()
 
     def stop_recognition(self):
         """
-        停止语音识别
+        Stop speech recognition
         """
         if not self.is_recording:
             return
 
         self.is_recording = False
 
-        # 停止识别服务
+        # Stop recognition service
         if self.recognition:
             self.recognition.stop()
-            print('语音识别已停止')
+            print('Speech recognition stopped')
             print(
-                '[指标] requestId: {}, 首包延迟ms: {}, 末包延迟ms: {}'
+                '[Metrics] requestId: {}, first package delay ms: {}, last package delay ms: {}'
                 .format(
                     self.recognition.get_last_request_id(),
                     self.recognition.get_first_package_delay(),
@@ -194,7 +194,7 @@ class SpeechRecognitionAgent:
                 )
             )
 
-        # 清理资源
+        # Clean up resources
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
@@ -204,52 +204,52 @@ class SpeechRecognitionAgent:
             self.mic.terminate()
             self.mic = None
 
-        # 删除热词表
+        # Delete vocabulary
         self._delete_vocabulary()
 
     def _signal_handler(self, sig, frame):
         """
-        信号处理器，处理Ctrl+C中断
+        Signal handler to handle Ctrl+C interrupt
         """
-        print('\n检测到中断信号，正在停止语音识别...')
+        print('\nInterrupt signal detected, stopping speech recognition...')
         self.stop_recognition()
 
     def on_text_recognized(self, text: str):
         """
-        当识别到文本时的处理方法
+        Processing method when text is recognized
         
         Args:
-            text: 识别到的文本
+            text: Recognized text
         """
         if self.on_text_callback:
             self.on_text_callback(text)
         else:
-            print(f'识别文本: {text}')
+            print(f'Recognized text: {text}')
 
     def on_speech_complete(self, text: str):
         """
-        当语音完成时的处理方法
+        Processing method when speech is complete
         
         Args:
-            text: 完整的语音文本
+            text: Complete speech text
         """
         if self.on_speech_complete_callback:
             self.on_speech_complete_callback(text)
         else:
-            print(f'语音完成: {text}')
+            print(f'Speech complete: {text}')
 
 
 class CustomRecognitionCallback(RecognitionCallback):
     """
-    自定义的识别回调类，用于处理识别事件
+    Custom recognition callback class for handling recognition events
     """
 
     def __init__(self, agent: SpeechRecognitionAgent):
         self.agent = agent
 
     def on_open(self) -> None:
-        print('识别连接已建立')
-        # 初始化麦克风
+        print('Recognition connection established')
+        # Initialize microphone
         self.agent.mic = pyaudio.PyAudio()
         self.agent.stream = self.agent.mic.open(
             format=pyaudio.paInt16,
@@ -259,8 +259,8 @@ class CustomRecognitionCallback(RecognitionCallback):
         )
 
     def on_close(self) -> None:
-        print('识别连接已关闭')
-        # 清理麦克风资源
+        print('Recognition connection closed')
+        # Clean up microphone resources
         if self.agent.stream:
             self.agent.stream.stop_stream()
             self.agent.stream.close()
@@ -271,38 +271,38 @@ class CustomRecognitionCallback(RecognitionCallback):
             self.agent.mic = None
 
     def on_complete(self) -> None:
-        print('识别任务完成')
+        print('Recognition task completed')
 
     def on_error(self, message) -> None:
-        print(f'识别错误 - request_id: {message.request_id}')
-        print(f'错误信息: {message.message}')
-        # 停止识别
+        print(f'Recognition error - request_id: {message.request_id}')
+        print(f'Error message: {message.message}')
+        # Stop recognition
         self.agent.stop_recognition()
 
     def on_event(self, result: RecognitionResult) -> None:
         sentence = result.get_sentence()
         if 'text' in sentence:
             text = sentence['text']
-            # 调用代理的文本处理方法
+            # Call agent's text processing method
             self.agent.on_text_recognized(text)
 
-            # 检查句子是否结束
+            # Check if sentence ended
             if RecognitionResult.is_sentence_end(sentence):
                 print(
-                    '句子结束 - request_id: %s, 用量: %s'
+                    'Sentence ended - request_id: %s, usage: %s'
                     % (result.get_request_id(), result.get_usage(sentence))
                 )
-                # 调用语音完成回调
+                # Call speech completion callback
                 self.agent.on_speech_complete(text)
 
 
-# 示例用法
+# Example usage
 if __name__ == '__main__':
-    # 简单的文本处理回调
+    # Simple text processing callback
     def handle_recognized_text(text):
-        print(f"实时识别: {text}")
+        print(f"Real-time recognition: {text}")
 
 
-    # 创建并启动语音识别Agent
+    # Create and start Speech Recognition Agent
     agent = SpeechRecognitionAgent(on_text_callback=handle_recognized_text)
     agent.start_recognition()

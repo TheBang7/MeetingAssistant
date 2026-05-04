@@ -10,36 +10,35 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-# 加载环境变量
+# Load environment variables
 load_dotenv()
 
 
 class TextAnalysisAgent:
     """
-    文本分析Agent，负责从转录文本中提取关键词、生成会议总结
+    Text Analysis Agent, responsible for extracting keywords and generating meeting summaries from transcribed text
     """
 
     def __init__(self,
                  keyword_extraction_method: str = "jieba",  # jieba or llm
                  max_keywords: int = 10):
         """
-        初始化文本分析Agent
+        Initialize text analysis Agent
         
         Args:
-            llm_model: 用于生成总结的LLM模型（默认使用环境变量中的配置）
-            keyword_extraction_method: 关键词提取方法 (jieba 或 llm)
-            max_keywords: 最大关键词数量
+            keyword_extraction_method: Keyword extraction method (jieba or llm)
+            max_keywords: Maximum number of keywords
         """
-        # 从环境变量获取配置
+        # Get configuration from environment variables
         self.llm_model = os.getenv("DASHSCOPE_LLM_MODEL_NAME", "deepseek-r1")
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY")
-        # 注意：base_url不应该包含"chat/completions"路径，因为ChatOpenAI会自动添加
+        # Note: base_url should not include "chat/completions" path as ChatOpenAI adds it automatically
         self.dashscope_llm_base_url = os.getenv("DASHSCOPE_LLM_BASE_URL",
                                                 "https://dashscope.aliyuncs.com/compatible-mode/v1")
         self.keyword_extraction_method = keyword_extraction_method
         self.max_keywords = max_keywords
 
-        # 初始化LLM
+        # Initialize LLM
         if self.dashscope_api_key:
             self.llm = ChatOpenAI(
                 model=self.llm_model,
@@ -48,47 +47,47 @@ class TextAnalysisAgent:
             )
         else:
             self.llm = None
-            print("警告: 未找到DASHSCOPE_API_KEY环境变量，将使用纯本地方法")
+            print("Warning: DASHSCOPE_API_KEY environment variable not found, will use pure local methods")
 
     def extract_keywords(self, text: str) -> List[Tuple[str, float]]:
         """
-        从文本中提取关键词
+        Extract keywords from text
         
         Args:
-            text: 输入文本
+            text: Input text
             
         Returns:
-            关键词和权重的列表
+            List of keywords and weights
         """
         if self.keyword_extraction_method == "jieba" or not self.llm:
-            # 使用jieba进行关键词提取
+            # Use jieba for keyword extraction
             return self._extract_keywords_jieba(text)
         else:
-            # 使用LLM进行关键词提取
+            # Use LLM for keyword extraction
             return self._extract_keywords_llm(text)
 
     def _extract_keywords_jieba(self, text: str) -> List[Tuple[str, float]]:
         """
-        使用jieba提取关键词
+        Extract keywords using jieba
 
         Args:
-            text: 输入文本
+            text: Input text
 
         Returns:
-            关键词和权重的列表
+            List of keywords and weights
         """
-        # 移除多余空格和特殊字符
+        # Remove extra spaces and special characters
         text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'[\\n\\r]+', ' ', text)
+        text = re.sub(r'[\n\r]+', ' ', text)
 
-        # 使用TF-IDF提取关键词
+        # Use TF-IDF to extract keywords
         keywords = jieba.analyse.extract_tags(
             text,
             topK=self.max_keywords,
             withWeight=True,
         )
 
-        # 如果TF-IDF提取效果不佳，使用TextRank
+        # If TF-IDF extraction is not effective, use TextRank
         if len(keywords) < 3:
             keywords = jieba.analyse.textrank(
                 text,
@@ -100,160 +99,160 @@ class TextAnalysisAgent:
 
     def _extract_keywords_llm(self, text: str) -> List[Tuple[str, float]]:
         """
-        使用LLM提取关键词
+        Extract keywords using LLM
         
         Args:
-            text: 输入文本
+            text: Input text
             
         Returns:
-            关键词和权重的列表
+            List of keywords and weights
         """
         if not self.llm:
-            raise ValueError("LLM未初始化，请确保DASHSCOPE_API_KEY环境变量已设置")
+            raise ValueError("LLM not initialized, please ensure DASHSCOPE_API_KEY environment variable is set")
 
-        # 构建提示
+        # Build prompt
         prompt = ChatPromptTemplate.from_template("""
-        请从以下会议文本中提取最重要的{max_keywords}个关键词，并为每个关键词分配一个0-1之间的权重，表示其重要性。
-        权重总和应接近1。
+        Please extract the most important {max_keywords} keywords from the following meeting text, and assign a weight between 0-1 to each keyword indicating its importance.
+        The sum of weights should be close to 1.
         
-        会议文本:
+        Meeting text:
         {text}
         
-        请以JSON格式返回，例如：
-        {{"keywords": [["关键词1", 0.2], ["关键词2", 0.15], ...]}}
+        Please return in JSON format, for example:
+        {{{{"keywords": [["keyword1", 0.2], ["keyword2", 0.15], ...]}}}}
         """)
 
-        # 设置输出解析器
+        # Set output parser
         parser = JsonOutputParser()
 
-        # 构建链
+        # Build chain
         chain = prompt | self.llm | parser
 
-        # 执行链
+        # Execute chain
         try:
             result = chain.invoke({
                 "text": text,
                 "max_keywords": self.max_keywords
             })
 
-            # 确保结果格式正确
+            # Ensure result format is correct
             if "keywords" in result:
                 return result["keywords"]
             else:
-                # 如果格式不正确，使用备用方法
+                # If format is incorrect, use fallback method
                 return self._extract_keywords_jieba(text)
         except Exception as e:
-            print(f"使用LLM提取关键词时出错: {e}")
-            # 失败时回退到jieba方法
+            print(f"Error when extracting keywords using LLM: {e}")
+            # Fall back to jieba method if failed
             return self._extract_keywords_jieba(text)
 
     def generate_summary(self, text: str, summary_type: str = "comprehensive") -> str:
         """
-        生成会议总结
+        Generate meeting summary
         
         Args:
-            text: 输入文本
-            summary_type: 总结类型 (comprehensive: 详细总结, concise: 简洁总结)
+            text: Input text
+            summary_type: Summary type (comprehensive: detailed summary, concise: brief summary)
             
         Returns:
-            生成的总结文本
+            Generated summary text
         """
         if self.llm:
-            # 使用LLM生成总结
+            # Use LLM to generate summary
             return self._generate_summary_llm(text, summary_type)
         else:
-            # 使用简单的本地方法生成总结
+            # Use simple local method to generate summary
             return self._generate_summary_local(text)
 
     def _generate_summary_llm(self, text: str, summary_type: str = "comprehensive") -> str:
         """
-        使用LLM生成总结
+        Generate summary using LLM
         
         Args:
-            text: 输入文本
-            summary_type: 总结类型
+            text: Input text
+            summary_type: Summary type
             
         Returns:
-            生成的总结文本
+            Generated summary text
         """
         if not self.llm:
-            raise ValueError("LLM未初始化，请确保DASHSCOPE_API_KEY环境变量已设置")
+            raise ValueError("LLM not initialized, please ensure DASHSCOPE_API_KEY environment variable is set")
 
-        # 根据总结类型设置提示内容
+        # Set prompt content based on summary type
         if summary_type == "comprehensive":
-            summary_prompt = "请提供详细的会议总结，包括讨论的主要议题、达成的共识、提出的行动项和决策。"
+            summary_prompt = "Please provide a detailed meeting summary, including main topics discussed, consensus reached, action items proposed, and decisions made."
         else:
-            summary_prompt = "请提供简洁的会议摘要，突出重点内容，控制在200字以内。"
+            summary_prompt = "Please provide a concise meeting summary, highlighting key points, limited to 200 characters."
 
-        # 构建提示
+        # Build prompt
         prompt = ChatPromptTemplate.from_template("""
-        你是一个专业的会议记录助手，请根据以下会议文本生成会议总结。
+        You are a professional meeting recording assistant. Please generate a meeting summary based on the following meeting text.
         
         {summary_prompt}
         
-        会议文本:
+        Meeting text:
         {text}
         
-        请直接输出总结文本，不要添加额外的说明。
+        Please output the summary text directly without additional explanation.
         """)
 
-        # 设置输出解析器
+        # Set output parser
         parser = StrOutputParser()
 
-        # 构建链
+        # Build chain
         chain = prompt | self.llm | parser
 
-        # 执行链
+        # Execute chain
         try:
             return chain.invoke({
                 "text": text,
                 "summary_prompt": summary_prompt
             })
         except Exception as e:
-            print(f"使用LLM生成总结时出错: {e}")
-            # 失败时回退到本地方法
+            print(f"Error when generating summary using LLM: {e}")
+            # Fall back to local method if failed
             return self._generate_summary_local(text)
 
     def _generate_summary_local(self, text: str) -> str:
         """
-        使用本地方法生成简单总结
+        Generate simple summary using local method
         
         Args:
-            text: 输入文本
+            text: Input text
             
         Returns:
-            生成的简单总结文本
+            Generated simple summary text
         """
-        # 提取关键词
+        # Extract keywords
         keywords = self._extract_keywords_jieba(text)
         keyword_str = ", ".join([kw[0] for kw in keywords[:5]])
 
-        # 简单统计
+        # Simple statistics
         sentences = re.split(r'[。！？；\n]+', text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
-        # 构建简单总结
-        summary = f"会议主要讨论了关于{keyword_str}等内容。会议包含{len(sentences)}个主要观点。"
+        # Build simple summary
+        summary = f"The meeting mainly discussed content related to {keyword_str}. The meeting contains {len(sentences)} main points."
 
-        # 添加第一个和最后一个句子作为上下文
+        # Add first and last sentences as context
         if len(sentences) > 0:
-            summary += f" 开始讨论：{sentences[0][:50]}..."
+            summary += f" Start of discussion: {sentences[0][:50]}..."
         if len(sentences) > 1:
-            summary += f" 结束讨论：{sentences[-1][:50]}..."
+            summary += f" End of discussion: {sentences[-1][:50]}..."
 
         return summary
 
     def analyze_speaker_turns(self, text: str) -> Dict[str, Any]:
         """
-        分析说话人轮流发言情况
+        Analyze speaker turns
         
         Args:
-            text: 带说话人标记的输入文本，格式如"A: 发言内容\nB: 发言内容"
+            text: Input text with speaker markers, format like "A: Speech content\nB: Speech content"
             
         Returns:
-            说话人统计信息
+            Speaker statistics
         """
-        # 简单的说话人识别模式
+        # Simple speaker recognition pattern
         speaker_pattern = r'^([A-Za-z0-9]+):'
         lines = text.strip().split('\n')
 
@@ -266,28 +265,28 @@ class TextAnalysisAgent:
         for line in lines:
             match = re.match(speaker_pattern, line.strip())
             if match:
-                # 处理前一个说话人的内容
+                # Process previous speaker's content
                 if current_speaker:
                     speaker_counts[current_speaker] += 1
                     if current_speaker not in speaker_texts:
                         speaker_texts[current_speaker] = []
                     speaker_texts[current_speaker].extend(current_text)
 
-                # 开始新的说话人
+                # Start new speaker
                 current_speaker = match.group(1)
                 current_text = [line[match.end():].strip()]
             else:
-                # 延续当前说话人的内容
+                # Continue current speaker's content
                 current_text.append(line.strip())
 
-        # 处理最后一个说话人的内容
+        # Process last speaker's content
         if current_speaker:
             speaker_counts[current_speaker] += 1
             if current_speaker not in speaker_texts:
                 speaker_texts[current_speaker] = []
             speaker_texts[current_speaker].extend(current_text)
 
-        # 计算每个说话人的发言长度
+        # Calculate each speaker's speech length
         speaker_lengths = {}
         for speaker, texts in speaker_texts.items():
             full_text = ' '.join(texts)
@@ -301,22 +300,22 @@ class TextAnalysisAgent:
 
     def process_meeting_text(self, text: str) -> Dict[str, Any]:
         """
-        处理完整的会议文本，返回综合分析结果
+        Process complete meeting text and return comprehensive analysis results
         
         Args:
-            text: 会议文本
+            text: Meeting text
             
         Returns:
-            包含关键词、总结、说话人分析等的综合结果
+            Comprehensive results including keywords, summary, speaker analysis, etc.
         """
-        # 提取关键词
+        # Extract keywords
         keywords = self.extract_keywords(text)
 
-        # 生成总结
+        # Generate summaries
         comprehensive_summary = self.generate_summary(text, "comprehensive")
         concise_summary = self.generate_summary(text, "concise")
 
-        # 分析说话人
+        # Analyze speakers
         speaker_analysis = self.analyze_speaker_turns(text)
 
         return {
@@ -328,35 +327,35 @@ class TextAnalysisAgent:
         }
 
 
-# 示例用法
+# Example usage
 if __name__ == "__main__":
-    # 示例会议文本
+    # Example meeting text
     sample_text = """
-    A: 今天我们讨论一下项目的进度和下一步计划。
-    B: 目前前端开发已经完成了80%，主要问题是用户认证模块还有一些bug。
-    A: 那后端的API接口开发情况如何？
-    C: 后端接口已经全部完成，正在进行单元测试。
-    B: 我们需要在下周前完成所有bug修复，然后进行集成测试。
-    A: 好的，那我们下周三进行一次项目评审会议。
+    A: Let's discuss the project progress and next steps today.
+    B: Currently, front-end development is 80% complete. The main issue is that there are still some bugs in the user authentication module.
+    A: How is the backend API interface development going?
+    C: Backend interfaces are all completed and undergoing unit testing.
+    B: We need to fix all bugs before next week, then conduct integration testing.
+    A: Okay, let's have a project review meeting next Wednesday.
     """
 
-    # 创建文本分析Agent (自动使用.env中的deepseek模型配置)
+    # Create Text Analysis Agent (automatically uses deepseek model configuration from .env)
     agent = TextAnalysisAgent()
 
-    # 处理会议文本
+    # Process meeting text
     result = agent.process_meeting_text(sample_text)
 
-    # 打印结果
-    print("=== 关键词 ===")
+    # Print results
+    print("=== Keywords ===")
     for keyword, weight in result["keywords"]:
         print(f"{keyword}: {weight:.4f}")
 
-    print("\n=== 详细总结 ===")
+    print("\n=== Comprehensive Summary ===")
     print(result["comprehensive_summary"])
 
-    print("\n=== 简洁总结 ===")
+    print("\n=== Concise Summary ===")
     print(result["concise_summary"])
 
-    print("\n=== 说话人分析 ===")
-    print(f"发言次数: {result['speaker_analysis']['speaker_counts']}")
-    print(f"发言长度: {result['speaker_analysis']['speaker_text_lengths']}")
+    print("\n=== Speaker Analysis ===")
+    print(f"Speaker turns: {result['speaker_analysis']['speaker_counts']}")
+    print(f"Speech lengths: {result['speaker_analysis']['speaker_text_lengths']}")
